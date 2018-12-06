@@ -1,3 +1,4 @@
+import time
 import smbus
 from time import sleep
 
@@ -5,16 +6,7 @@ from time import sleep
 #from https://github.com/yuma-m/raspi_lcd_acm1602ni
 from character_table import INITIALIZE_CODES, LINEBREAK_CODE, CHAR_TABLE
 
-lcd = smbus.SMbus(1)
-LCD_ADDR = 0x50
-
-FUNCTION_SET_myLCD = 0x38
-
-
-	
-
 class ACM1602:
-	lcd = None
 	BUS_ADDR = 1
 	SLAVE_ADDR = 0x50
 	CONTROL_SET = 0x00
@@ -28,53 +20,52 @@ class ACM1602:
 	bFS = 0x38
 	bCDS = 0x1C
 
-	def __init__(self,BUS_ADDR):
-		self.CD=self.ClearDisplay()
-		self.RH=self.ReturnHome()
-		self.EMS=self.EntryModeSet()
-		self.DOOC=self.DisplayOnOffControl()
-		self.CDS=CursorDisplayControl()
-		self.FS=FunctionSet()
+	def __init__(self):
+		self.lcd = smbus.SMBus(self.BUS_ADDR)
+		self.sleeptime = 0.01
 
-		self.lcd = smbus.SMbus(self.BUS_ADDR)
+		#make instance
+		self.entryModeSet       = self.EntryModeSet()
+		self.displayOnOffControl= self.DisplayOnOffControl()
+		self.cursorDisplayShift = self.CursorDisplayShift()
+		self.functionSet        = self.FunctionSet()
+
+		#override Base class' property 'parent'
+		self.entryModeSet.parent        = self
+		self.displayOnOffControl.parent = self
+		self.cursorDisplayShift.parent  = self
+		self.functionSet.parent         = self
+
+		#initialize
+		self.functionSet.set(self.FunctionSet.DATA8_LINE2_YDOTS10)
+		self.clearDisplay()
+		self.entryModeSet.set(self.EntryModeSet.MOJIWOUTTARA_CURSOR_MIGI)
+		self.displayOnOffControl.set(self.DisplayOnOffControl.DISPON_CURSORON_BLINKON)
 
 	class Base:
 		def __init__(self):
-			pass
+			self.parent = null #interface like Java This must be overrided when this class is inherited.
 		def set(self,num):
-			ACM1602._set(num)
+			self.parent._set(num)
 		def dict(self):
 			for ele in self.__dict__:
 				print(ele)
 
-	class ClearDisplayi(Base):
-		def __init__(self):
-			pass
-		def set(self):#Override
-			ACM1602._set(num)
+	def clearDisplay(self):
+			self._set(1)
 
-	class RturnHome(Base):
-	
-	
-	
-	
-	
-	
-	
-	def __init__(self):
-			pass
-		def set(self):#Override
-			ACM1602._set(num)
+	def returnHome(self):
+			self._set(2)
 
 	class EntryModeSet(Base):
-		MOJIWOUTTARA_KA-SORU_MIGI   = 0x6
-		MOJIWOUTTARA_KA-SORU_HIDARI = 0x4
+		MOJIWOUTTARA_CURSOR_MIGI   = 0x6
+		MOJIWOUTTARA_CURSOR_HIDARI = 0x4
 		MOJIWOUTTARA_GAMEN_MIGI     = 0x7
 		MOJIWOUTTARA_GAMEN_HIDARI   = 0x5
 		def __init__(self):
 			pass
 		
-	class DisplayOnOffControll(Base):
+	class DisplayOnOffControl(Base):
 		DISPON_CURSORON_BLINKON    = 0xF
 		DISPON_CURSORON_BLINKOFF   = 0xE
 		DISPON_CURSOROFF_BLINKON   = 0xD
@@ -105,34 +96,76 @@ class ACM1602:
 		DATA4_LINE1_YDOTS10 = 0x20
 		def __init__(self):
 			pass
-
-	def setOrdinary(self):
-		self.FS.set(FS.
 	
-	def sendMessage(self,strs):
-		for letter in strs:
-			self._put(letter)
+	def setDDRAMAddress(self,gyou,retsu):
+		if gyou < 1:gyou = 1
+		if gyou > 2:gyou = 2
+		if retsu < 1:retsu = 1
+		if retsu > 16:retsu = 16
+		addr = (gyou - 1) * 0x40 + retsu -1;	
+		addr = addr | 0x80
+		self._set(addr)
 
-	@classmethod
+	def sendMessage(self,strs):
+		strs = strs + "                    "
+		for ii in range(15):
+			self._put(strs[ii])
+
 	def _set(self,num):
 		if self.lcd is not None:
-			self.lcd.write_byte_data(SLAVE_ADDR,CONTROL_SET,num)
+			self.lcd.write_byte_data(self.SLAVE_ADDR,self.CONTROL_SET,num)
+			time.sleep(0.01)
 		else:
-			self._message_not_open()
+			self._message_not_open(self)#クラスメソッドの中からインスタンスメソッドを呼ぶときにはselfを渡す。
 
 	def _put(self,str):
 		if self.lcd is not None:
+			if str == " " or str == "　":
+				sp = 0.01
+			else:
+				sp = self.sleeptime
 			try:
-				byte = CHAR_TABLE[str]
+				bytes = CHAR_TABLE[str]
 			except KeyError:
-				byte = CHAR_TABLE["X"]
-
-			self.lcd.write_byte_data(SLAVE_ADDR,CONTROL_WRITE,byte)
-		else
+				bytes = CHAR_TABLE["X"]
+			if len(bytes) == 2:
+				sp = 0.01
+			for byte in bytes:
+				self.lcd.write_byte_data(self.SLAVE_ADDR,self.CONTROL_WRITE,int(byte))
+				time.sleep(sp)
+				sp = self.sleeptime
+		else:
 			self._message_not_open()
 
 	def _message_not_open(self):
+		print(self)
 		print("self.lcd has been None yet.")
 
+	def speed(self,sp):
+		if sp < 0.01:sp = 0.01
+		self.sleeptime = sp
+	#sugars
 
-if __name__ == __main__:
+	def cls(self):
+		self.clearDisplay()
+	def cls1(self):
+		self.line1()
+		self.sendMessage("                 ")
+	def cls2(self):
+		self.line2()
+		self.sendMessage("                 ")
+	def line1(self):
+		self.setDDRAMAddress(1,1)
+	def line2(self):
+		self.setDDRAMAddress(2,1)
+		
+
+if __name__ == '__main__':
+
+	a = ACM1602()
+	a.cls()
+	a.speed(0.5)
+	a.sendMessage("コンニチハ")
+	a.line2()
+	a.sendMessage("キョウハイイテンキデスネ")
+
