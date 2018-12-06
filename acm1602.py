@@ -42,6 +42,9 @@ class ACM1602:
 		self.entryModeSet.set(self.EntryModeSet.MOJIWOUTTARA_CURSOR_MIGI)
 		self.displayOnOffControl.set(self.DisplayOnOffControl.DISPON_CURSORON_BLINKON)
 
+	def version(self):
+		return '1.0'
+
 	class Base:
 		def __init__(self):
 			self.parent = null #interface like Java This must be overrided when this class is inherited.

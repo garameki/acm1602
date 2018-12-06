@@ -1,3 +1,12 @@
+## 1.0.1 (12月 07, 2018)
+  - Merge from the branch release-1.0  v1.0.0...HEAD
+  - Create new release-1.0 branch  v1.0.0...HEAD
+  - Merge from the branch release-0.1  v1.0.0...HEAD
+  - Reconstruct 	new file:   .gitignore 	modified:   acm1602.py 	deleted:    tests/__pycache__/character_table.cpython-35.pyc  v1.0.0...HEAD
+  - restrut  v1.0.0...HEAD
+  - Add VERSION and CHANGELOG.md files, Bump version to v0.1.0.  v1.0.0...HEAD
+  - first commi  v1.0.0...HEAD
+
 ## 1.0 (12月 07,2018)
   - Merge from the branch release-0.1  v0.1.0...HEAD
   - Reconstruct 	new file:   .gitignore 	modified:   acm1602.py 	deleted:    tests/__pycache__/character_table.cpython-35.pyc  v0.1.0...HEAD
