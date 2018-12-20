@@ -21,6 +21,7 @@ class ACM1602:
 	bCDS = 0x1C
 
 	def __init__(self):
+		self.pos = [0,0,0]
 		self.lcd = smbus.SMBus(self.BUS_ADDR)
 		self.sleeptime = 0.01
 
@@ -56,15 +57,18 @@ class ACM1602:
 
 	def clearDisplay(self):
 			self._set(1)
+			self.pos[1] = 0
+			self.pos[2] = 0
 
 	def returnHome(self):
 			self._set(2)
 
+
 	class EntryModeSet(Base):
 		MOJIWOUTTARA_CURSOR_MIGI   = 0x6
 		MOJIWOUTTARA_CURSOR_HIDARI = 0x4
-		MOJIWOUTTARA_GAMEN_MIGI     = 0x7
-		MOJIWOUTTARA_GAMEN_HIDARI   = 0x5
+		MOJIWOUTTARA_GAMEN_MIGI     = 0x5
+		MOJIWOUTTARA_GAMEN_HIDARI   = 0x7
 		def __init__(self):
 			pass
 		
@@ -81,10 +85,10 @@ class ACM1602:
 			pass
 	
 	class CursorDisplayShift(Base):
-		CURSOR_MIGI = 0x18
-		CURSOR_HIDARI = 0x1C
-		SCREEN_MIGI = 0x10
-		SCREEN_HIDARI =0x14
+		SCREEN_HIDARI = 0x18
+		SCREEN_MIGI = 0x1C
+		CURSOR_HIDARI = 0x10
+		CURSOR_MIGI =0x14
 		def __init__(self):
 			pass
 
@@ -100,19 +104,41 @@ class ACM1602:
 		def __init__(self):
 			pass
 	
-	def setDDRAMAddress(self,gyou,retsu):
-		if gyou < 1:gyou = 1
-		if gyou > 2:gyou = 2
-		if retsu < 1:retsu = 1
-		if retsu > 16:retsu = 16
-		addr = (gyou - 1) * 0x40 + retsu -1;	
-		addr = addr | 0x80
-		self._set(addr)
+	def setCGRAMAddress(self,xx):
+		xx = xx | 0x40
+		self._set(xx)
+	
+#	def setDDRAMAddress(self,gyou,retsu):
+#		if gyou < 1:gyou = 1
+#		if gyou > 2:gyou = 2
+#		if retsu < 1:retsu = 1
+#		if retsu > 16:retsu = 16
+#		addr = (gyou - 1) * 0x40 + retsu -1;	
+#		addr = addr | 0x80
+#		self._set(addr)
 
-	def sendMessage(self,strs):
-		strs = strs + "                    "
-		for ii in range(15):
-			self._put(strs[ii])
+	def setDDRAMAddress(self,xx):
+		xx = xx | 0x80
+		self._set(xx)
+
+
+	def sendMessage(self,strs,nLine):
+		nByte = 0
+		for ii in range(len(strs)):
+			nByte += self._put1(strs[ii],nLine)
+		return nByte
+
+	def send2Messages(self,str1,str2):
+		bytes1 = self.sendMessage(str1,1)
+		bytes2 = self.sendMessage(str2,2)
+
+		if bytes1 > bytes2:
+			self.sendMessage(' ' * (bytes1 -bytes2),2)
+		elif bytes2 > bytes1:
+			self.sendMessage(' ' * (bytes2 -bytes1),1)
+
+		return bytes1 if bytes1 > bytes2 else bytes2
+
 
 	def _set(self,num):
 		if self.lcd is not None:
@@ -120,8 +146,11 @@ class ACM1602:
 			time.sleep(0.01)
 		else:
 			self._message_not_open(self)#クラスメソッドの中からインスタンスメソッドを呼ぶときにはselfを渡す。
+	def _put1(self,str,nLine):
 
-	def _put(self,str):
+		#nLine > 2 or nLine < 1 then エラー発生
+
+
 		if self.lcd is not None:
 			if str == " " or str == "　":
 				sp = 0.01
@@ -134,11 +163,25 @@ class ACM1602:
 			if len(bytes) == 2:
 				sp = 0.01
 			for byte in bytes:
+				if nLine == 1:
+					self.setDDRAMAddress(self.pos[nLine])
+				else:
+					self.setDDRAMAddress(0x40 + self.pos[nLine])
+
+				if self.pos[nLine] > 39:
+					if nLine == 1:
+						self.setDDRAMAddress(0)
+					else:
+						self.setDDRAMAddress(0x40)
+					self.pos[nLine] = 0
 				self.lcd.write_byte_data(self.SLAVE_ADDR,self.CONTROL_WRITE,int(byte))
-				time.sleep(sp)
+				self.pos[nLine] += 1
+				#time.sleep(sp)
 				sp = self.sleeptime
 		else:
 			self._message_not_open()
+		return len(bytes)
+
 
 	def _message_not_open(self):
 		print(self)
@@ -158,17 +201,99 @@ class ACM1602:
 		self.line2()
 		self.sendMessage("                 ")
 	def line1(self):
-		self.setDDRAMAddress(1,1)
+		self.setDDRAMAddress(0)
 	def line2(self):
-		self.setDDRAMAddress(2,1)
+		self.setDDRAMAddress(0x40)
 		
+
+	def screenMigi(self,nn):
+		for i in range(nn):
+			self.cursorDisplayShift.set(self.CursorDisplayShift.SCREEN_MIGI)
+	def screenHidari(self,nn):
+		for i in range(nn):
+			self.cursorDisplayShift.set(self.CursorDisplayShift.SCREEN_HIDARI)
+	def cursorHidari(self,nn):
+		for i in range(nn):
+			self.cursorDisplayShift.set(self.CursorDisplayShift.CURSOR_HIDARI)
+	def cursorMigi(self,nn):
+		for i in range(nn):
+			self.cursorDisplayShift.set(self.CursorDisplayShift.CURSOR_MIGI)
+			
+
+
 
 if __name__ == '__main__':
 
 	a = ACM1602()
-	a.cls()
-	a.speed(0.5)
-	a.sendMessage("コンニチハ")
-	a.line2()
-	a.sendMessage("キョウハイイテンキデスネ")
+
+	print(a.pos)
+
+	#画面に表示する
+	if True:
+		a.cls()
+		a.speed(0.01)
+		a.sendMessage("コンニチハ",1)
+	#	a.line2()
+	#	a.sendMessage("キョウハイイテンキデスネ",1)
+	#push命令を作る
+	#行を指定して文字列をpushすると、現在の表示がだんだんと左にずれて、pushした文字列が右側から現れるという機能
+	if False:
+		a.cls()
+		a.entryModeSet.set(a.EntryModeSet.MOJIWOUTTARA_CURSOR_MIGI)
+		#a.sendMessage('     o                             ')
+		#a.entryModeSet.set(a.EntryModeSet.MOJIWOUTTARA_GAMEN_HIDARI)
+		i=0
+		for n in range(1,41):
+			a.sendMessage(str(n%10))	
+			i += 1
+			print(i)
+			if i > 16:
+				a.screenHidari(1)
+				pass
+		a.setDDRAMAddress(0x40 + 39 )
+
+		a.sendMessage("A")	
+	if True:
+		import threading
+
+		class MyThread1(threading.Thread):
+			def __init__(self):
+				threading.Thread.__init__(self)
+
+			def run(self):
+
+				while True:
+					a.screenHidari(1)
+					a.pos[0] += 1
+					time.sleep(0.1)
+
+		class MyThread2(threading.Thread):
+			def __init__(self):
+				threading.Thread.__init__(self)
+
+			def run(self):
+				i=0	
+				stringss1 = ["コンヤノテンキ","グンマケン","サイタマケン","トチギケン"]
+				stringss2 = ["","ハレ","ハレ","クモリ"]
+				while True:
+					begin = a.pos[0]
+					i += 1	
+					bytes = a.send2Messages(stringss1[i%3],stringss2[i%3])
+					bytes += a.send2Messages(" "," ")
+
+					while a.pos[0] != begin + bytes:
+						time.sleep(0.05)
+
+		a.pos[1] = 20
+		a.pos[2] = 20
+		thread1 = MyThread1()
+		thread2 = MyThread2()
+		thread1.start()
+		thread2.start()
+		thread1.join()
+		thread2.join()
+
+
+
+
 
